@@ -16,6 +16,9 @@ st.sidebar.title("Corruption Scenario")
 severity_level = st.sidebar.slider("Select Severity", min_value=0, max_value=5, value=5)
 num_samples = st.sidebar.number_input("number of samples", value=1000)
 batch_size = st.sidebar.number_input("batch size", value=100)
+model_checkpoint = st.sidebar.selectbox(
+    "model_checkpoint", options=["pre-trained", "src_0", "src_1", "src_2"]
+)
 
 ########################################
 #          Main Page Section           #
@@ -63,9 +66,14 @@ def load_model():
     import torchvision
     import torch.nn as nn
 
-    net = torchvision.models.resnet18(pretrained=True)
-    num_feats = net.fc.in_features
-    net.fc = nn.Linear(num_feats, 10)  # match class number
+    if model_checkpoint == "pre-trained":
+        net = torchvision.models.resnet18(pretrained=True)
+        num_feats = net.fc.in_features
+        net.fc = nn.Linear(num_feats, 10)  # match class number
+    else:
+        checkpoint_path = Path(__file__).parent.parent / "tgt_test"
+        checkpoint_path / f"reproduce_{model_checkpoint}" / "cp/cp_last.pth.tar"
+
     return net.to(device)
 
 
@@ -90,15 +98,12 @@ def get_acc(current_batch):
     # append values to lists
     st.session_state.true_cls_list += [int(c) for c in cls]
     st.session_state.pred_cls_list += [int(c) for c in y_pred.tolist()]
-    print(st.session_state.true_cls_list)
-    print(st.session_state.pred_cls_list)
     match = sum(
         np.array(st.session_state.true_cls_list)
         == np.array(st.session_state.pred_cls_list)
     )
     cumul_accuracy = match / len(st.session_state.true_cls_list)
     st.session_state.accuracy_list.append(cumul_accuracy)
-
     return cumul_accuracy
 
 
@@ -112,6 +117,9 @@ bar = st.progress(st.session_state.current_step / num_steps)
 ### Next button
 button_disabled = st.session_state.current_step >= num_steps - 1
 next_button = st.button("Next Step", disabled=button_disabled)
+if st.button("Reset"):
+    for key, value in default_values.items():
+        st.session_state[key] = value
 
 if next_button:
     # get next batch
