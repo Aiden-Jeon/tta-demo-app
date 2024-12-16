@@ -4,17 +4,40 @@ import torch
 import numpy as np
 from torch.utils.data import Dataset
 
+CORRUPT_DOMAIN = [
+    "all",
+    "brightness",
+    "contrast",
+    "defocus_blur",
+    "elastic_transform",
+    "fog",
+    "frost",
+    "gaussian_noise",
+    "glass_blur",
+    "impulse_noise",
+    "jpeg_compression",
+    "motion_blur",
+    "pixelate",
+    "shot_noise",
+    "snow",
+    "test",
+    "zoom_blur",
+]
+
 
 class CifarDataset(Dataset):
     def __init__(
         self,
         dataset_root: str = "dataset/CIFAR-10-C/",
+        corrupt_domain: str = "all",
         severity_level: int = 0,
         num_samples: int = 1000,
     ):
         super().__init__()
         self.dataset_root = Path(dataset_root)
         assert 0 <= severity_level <= 5
+        assert corrupt_domain in CORRUPT_DOMAIN
+        self.corrupt_domain = corrupt_domain
         self.severity_level = severity_level
         self.num_samples = num_samples
         self.X = None
@@ -36,9 +59,16 @@ class CifarDataset(Dataset):
             dataset_folder = (
                 self.dataset_root / "corrupted" / f"severity-{self.severity_level}"
             )
-            corrupt_filepaths = list(
-                filter(lambda x: "label" not in str(x), dataset_folder.glob("*.npy"))
-            )
+            corrupt_filepaths = []
+            for path in dataset_folder.glob("*.npy"):
+                if "label" in str(path):
+                    continue
+                elif self.corrupt_domain == "all":
+                    corrupt_filepaths += [path]
+                else:
+                    if self.corrupt_domain in str(path):
+                        corrupt_filepaths += [path]
+
             corrupt_num_samples = [self.num_samples // len(corrupt_filepaths)] * len(
                 corrupt_filepaths
             )

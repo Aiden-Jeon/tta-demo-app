@@ -13,7 +13,29 @@ from dataset import CifarDataset
 ########################################
 st.sidebar.title("Corruption Scenario")
 
-severity_level = st.sidebar.slider("Select Severity", min_value=0, max_value=5, value=5)
+corrupt_domain = st.sidebar.selectbox(
+    "Corrupt Domain",
+    options=[
+        "all",
+        "brightness",
+        "contrast",
+        "defocus_blur",
+        "elastic_transform",
+        "fog",
+        "frost",
+        "gaussian_noise",
+        "glass_blur",
+        "impulse_noise",
+        "jpeg_compression",
+        "motion_blur",
+        "pixelate",
+        "shot_noise",
+        "snow",
+        "test",
+        "zoom_blur",
+    ],
+)
+severity_level = st.sidebar.slider("Severity Level", min_value=0, max_value=5, value=5)
 num_samples = st.sidebar.number_input("number of samples", value=1000)
 batch_size = st.sidebar.number_input("batch size", value=100)
 model_checkpoint = st.sidebar.selectbox(
@@ -44,9 +66,10 @@ st.title("TTA Demo App")
 # Data & Model Setting
 ## Load Dataset
 @st.cache_data
-def load_dataset(severity_level: int, num_samples: int):
+def load_dataset(corrupt_domain: str, severity_level: int, num_samples: int):
     dataset = CifarDataset(
         dataset_root=Path(__file__).parent.parent / "dataset/CIFAR-10-C/",
+        corrupt_domain=corrupt_domain,
         severity_level=severity_level,
         num_samples=num_samples,
     )
@@ -55,6 +78,7 @@ def load_dataset(severity_level: int, num_samples: int):
 
 
 dataset = load_dataset(
+    corrupt_domain=corrupt_domain,
     severity_level=severity_level,
     num_samples=num_samples,
 )
