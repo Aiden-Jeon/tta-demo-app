@@ -12,6 +12,7 @@ torch = "^2.5.1"
 torchvision = "^0.20.1"
 torchaudio = "^2.5.1"
 scikit-learn = "^1.6.0"
+robustbench = {git = "https://github.com/RobustBench/robustbench.git"}
 
 
 [build-system]

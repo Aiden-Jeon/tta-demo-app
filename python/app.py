@@ -5,7 +5,7 @@ import numpy as np
 from torchvision.utils import make_grid
 from sklearn.metrics import f1_score
 
-from dataset import CifarDataset
+from data import CifarDataset, build_loader
 
 
 ########################################
@@ -13,30 +13,30 @@ from dataset import CifarDataset
 ########################################
 st.sidebar.title("Corruption Scenario")
 
-corrupt_domain = st.sidebar.selectbox(
-    "Corrupt Domain",
-    options=[
-        "all",
-        "brightness",
-        "contrast",
-        "defocus_blur",
-        "elastic_transform",
-        "fog",
-        "frost",
-        "gaussian_noise",
-        "glass_blur",
-        "impulse_noise",
-        "jpeg_compression",
-        "motion_blur",
-        "pixelate",
-        "shot_noise",
-        "snow",
-        "test",
-        "zoom_blur",
-    ],
-)
-severity_level = st.sidebar.slider("Severity Level", min_value=0, max_value=5, value=5)
-num_samples = st.sidebar.number_input("number of samples", value=1000)
+# corrupt_domain = st.sidebar.selectbox(
+#     "Corrupt Domain",
+#     options=[
+#         "all",
+#         "brightness",
+#         "contrast",
+#         "defocus_blur",
+#         "elastic_transform",
+#         "fog",
+#         "frost",
+#         "gaussian_noise",
+#         "glass_blur",
+#         "impulse_noise",
+#         "jpeg_compression",
+#         "motion_blur",
+#         "pixelate",
+#         "shot_noise",
+#         "snow",
+#         "test",
+#         "zoom_blur",
+#     ],
+# )
+severity = st.sidebar.slider("Severity Level", min_value=1, max_value=5, value=5)
+num_samples = st.sidebar.number_input("samples per domain", value=100)
 batch_size = st.sidebar.number_input("batch size", value=100)
 model_checkpoint = st.sidebar.selectbox(
     "model_checkpoint", options=["pre-trained", "src_0", "src_1", "src_2"]
@@ -46,8 +46,9 @@ model_checkpoint = st.sidebar.selectbox(
 #          Main Page Section           #
 ########################################
 # Session State
-num_steps = num_samples // batch_size
-num_steps += 1 if num_samples % batch_size else 0
+total_samples = num_samples * 15
+num_steps = total_samples // batch_size
+num_steps += 1 if total_samples % batch_size else 0
 default_values = {
     "true_cls_list": [],
     "pred_cls_list": [],
@@ -65,22 +66,20 @@ st.title("TTA Demo App")
 
 # Data & Model Setting
 ## Load Dataset
-@st.cache_data
-def load_dataset(corrupt_domain: str, severity_level: int, num_samples: int):
+@st.cache_resource
+def load_dataloader(severity: int, num_samples: int, batch_size: int):
     dataset = CifarDataset(
-        dataset_root=Path(__file__).parent.parent / "dataset/CIFAR-10-C/",
-        corrupt_domain=corrupt_domain,
-        severity_level=severity_level,
+        severity=severity,
         num_samples=num_samples,
     )
+    loader = build_loader(dataset, batch_size=batch_size)
+    return iter(loader)
 
-    return dataset
 
-
-dataset = load_dataset(
-    corrupt_domain=corrupt_domain,
-    severity_level=severity_level,
+dataloader = load_dataloader(
+    severity=severity,
     num_samples=num_samples,
+    batch_size=batch_size,
 )
 
 
@@ -101,9 +100,8 @@ def load_model():
     return net.to(device)
 
 
-def load_next_batch(dataset):
-    num_sample = st.session_state.current_step * batch_size
-    feats, cls, dos = dataset[num_sample : num_sample + batch_size]
+def load_next_batch():
+    feats, cls, dos = next(dataloader)
     return feats, cls, dos
 
 
@@ -114,7 +112,7 @@ net = load_model()
 ## Calculate accuracy
 @torch.no_grad()
 def get_acc(current_batch):
-    feats, dls, cls = current_batch
+    feats, cls, dls = current_batch
     feats, cls = feats.to(device), cls.to(device)
     y_pred = net(feats)
     y_pred = y_pred.max(1, keepdim=False)[1]
@@ -147,7 +145,7 @@ if st.button("Reset"):
 
 if next_button:
     # get next batch
-    current_batch = load_next_batch(dataset)
+    current_batch = load_next_batch()
     feats, *_ = current_batch
     st.image(
         make_grid(feats, nrow=10).permute(1, 2, 0).numpy(), use_container_width=True
